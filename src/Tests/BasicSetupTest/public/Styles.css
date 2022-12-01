@@ -1,0 +1,187 @@
+.dragHandle:active {
+    cursor: grabbing !important;
+  }
+  
+  .rotate {
+    animation: rotation 2s infinite linear;
+  }
+  
+  @keyframes rotation {
+    from {
+      transform: rotate(0deg);
+    }
+  
+    to {
+      transform: rotate(359deg);
+    }
+  }
+  
+  .split-view-container {
+    width: 100%;
+    height: 100%;
+  }
+  
+  .split-view {
+    width: 100%;
+    height: 100%;
+  }
+  
+  .split-view-horizontal>.split-view-view {
+    height: 100%
+  }
+  
+  .noselect {
+    -webkit-touch-callout: none;
+    /* iOS Safari */
+    -webkit-user-select: none;
+    /* Safari */
+    -khtml-user-select: none;
+    /* Konqueror HTML */
+    -moz-user-select: none;
+    /* Old versions of Firefox */
+    -ms-user-select: none;
+    /* Internet Explorer/Edge */
+    user-select: none;
+    /* Non-prefixed version, currently
+                                      supported by Chrome, Edge, Opera and Firefox */
+  }
+  
+  @keyframes connectionIndRec {
+    0% {
+      background-color: #4caf50;
+    }
+  
+    75% {
+      background-color: #1b5e20;
+    }
+  
+    100% {
+      background-color: #212121;
+      ;
+    }
+  }
+  
+  @keyframes connectionIndSend {
+    0% {
+      background-color: #26c6da;
+    }
+  
+    25% {
+      background-color: #03a9f4;
+    }
+  
+    75% {
+      background-color: #01579b;
+    }
+  
+    100% {
+      background-color: #212121;
+      ;
+    }
+  }
+  
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+  
+  /* Track */
+  ::-webkit-scrollbar-track {
+    background: #3232323d;
+  }
+  
+  /* Handle */
+  ::-webkit-scrollbar-thumb {
+    background: #4646466e;
+  }
+  
+  /* Handle on hover */
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+  
+  input[type="color"] {
+    -webkit-appearance: none;
+    border: none;
+    padding: 0;
+  }
+  
+  input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  
+  input[type="color"]::-webkit-color-swatch {
+    border: none;
+  }
+  
+  .dragHandlee {
+    cursor: grab
+  }
+  
+  .dragHandlee::active {
+    cursor: grabbing
+  }
+  
+  .dragToReorder:not(:active) {
+    transition: 'transform 1s';
+    
+  }
+  
+  ::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+  
+  @-webkit-keyframes slideOut {
+    0% {
+      transform: translate(0%, 0px);
+    }
+  
+    100% {
+      transform: translate(1000%, 0px);
+    }
+  }
+  
+  @keyframes slideOut {
+    0% {
+      transform: translate(0%, 0px);
+    }
+  
+    100% {
+      transform: translate(1000%, 0px);
+    }
+  }
+  
+  @-webkit-keyframes slideIn {
+    0% {
+      transform: translate(1000%, 0px);
+    }
+  
+    100% {
+      transform: translate(0%, 0px);
+    }
+  }
+  
+  @keyframes slideIn {
+    0% {
+      transform: translate(1000%, 0px);
+    }
+  
+    100% {
+      transform: translate(0%, 0px);
+    }
+  }
+  
+  @keyframes widthZeroToFull {
+    0% {
+      width: 0%
+    }
+  
+    100% {
+      width: 100%
+    }
+  }
+  
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }

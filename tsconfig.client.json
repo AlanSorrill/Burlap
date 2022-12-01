@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "jsx": "react",
+        "experimentalDecorators": true,
+        "module": "commonjs",
+        "target": "ES2016",
+        "esModuleInterop": true,
+        "moduleResolution": "node",
+        "sourceMap": true,
+        "outDir": "build/clientTSBuild",
+        "skipLibCheck": true,
+        "declaration": true,
+        "declarationMap": true,
+        "declarationDir": "build/clientDeclarations",
+        "strictNullChecks": false,
+        "downlevelIteration": true
+    },
+    "include": ["src/Client", "src/Tests/**/Client"],
+    "exclude": ["src/Server"],
+    "lib": ["es2015"],
+    
+  }
