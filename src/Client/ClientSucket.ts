@@ -6,6 +6,7 @@ export abstract class ClientSucket<Protocol extends SucketProtocol> extends Suck
         super();
         this.options = options;
     }
+    
     protected async onSuckMsg(msg: TransactionId<SuckMSG<Protocol>>) {
         switch (msg.suckType) {
             case 'reqResReq':

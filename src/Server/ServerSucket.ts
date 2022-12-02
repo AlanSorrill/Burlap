@@ -1,4 +1,4 @@
-import { Burlap, copyCombine, DefaultProtocol, Protocol_GetEventNames, Protocol_GetEventPacketObj, Protocol_GetEventRegObj, Protocol_GetState, ServerSucketOptions, Sucket, SucketProtocol, SuckMSG, TransactionId } from './ServerImports'
+import { Burlap, capitalizeFirstLetter, copyCombine, DefaultProtocol, Protocol_GetEventNames, Protocol_GetEventPacketObj, Protocol_GetEventRegObj, Protocol_GetState, ServerSucketOptions, Sucket, SucketProtocol, SuckMSG, TransactionId } from './ServerImports'
 import ws from 'ws'
 
 // export type SucketOptions<Protocol extends SucketProtocol> = SucketOptions<Protocol> //& { defaultEventPredicates: SucketEventPredicate<DefaultSucketProtocol['eventTypes']> }
@@ -57,6 +57,18 @@ export abstract class ServerSucket<Protocol extends SucketProtocol> extends Suck
 
     protected async onSuckMsg(msg: TransactionId<SuckMSG<Protocol>>) {
         switch (msg.suckType) {
+            case 'reqResReq':
+                let listenerKey = `on${capitalizeFirstLetter(msg.message['type'].substring(0, msg.message['type'].length - 3))}`
+                let listener: (msg: any, state: any) => (Promise<any>) = this.options.reqRespListeners[listenerKey];
+                if (typeof listener == 'undefined') {
+                    console.error(`Failed to find listener for ${listenerKey}`, listener)
+
+                    return;
+                }
+                console.log(`Responding to reqResp ${msg.message['type']} with listener ${listenerKey}`, listener)
+                let result = await listener(msg.message,this.state);
+                this.sendSuckMsg({ suckType: 'reqResResp', transactionId: msg.transactionId, message: result })
+                return;
             case 'eventRegisterRequestReq':
                 console.log(`Event registration ${msg.eventName}`)
                 let mapForEvent = this.eventRegistrations.get(msg.eventName);

@@ -9,6 +9,10 @@
       "./client": "./build/serverTsBuild/Client/ClientImports.js"
     
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlanSorrill/Burlap.git"
+  },
   "typesVersions": {
     "*": {
       "server": [

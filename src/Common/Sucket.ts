@@ -1,6 +1,6 @@
 import { ArrToObjHelper, capitalizeFirstLetter, copyCombine, FieldsNotEndingWith, FieldsStartingWith, FieldsToUnion, KeysEndingWith_ReturnPrefix, MSG_Error, RemoveNevers, UnionToArray, UnionToIntersection } from "./CommonImports"
 
-export type Protocol_GetReqNames<Protocol extends SucketProtocol> = KeysEndingWith_ReturnPrefix<ArrToObjHelper<UnionToArray<Protocol['reqRespTypes']>, 'type'>, 'Req'>
+export type Protocol_GetReqNames<Protocol extends SucketProtocol> = KeysEndingWith_ReturnPrefix<ArrToObjHelper<UnionToArray<Protocol['reqRespTypes']>, 'type'>, 'Req'> & string
 export type Protocol_GetReqObj<Protocol extends SucketProtocol, MsgName extends Protocol_GetReqNames<SucketProtocol>> = `${MsgName & string}Req` extends keyof ArrToObjHelper<UnionToArray<Protocol['reqRespTypes']>, 'type'> ? ArrToObjHelper<UnionToArray<Protocol['reqRespTypes']>, 'type'>[`${MsgName & string}Req`] : false
 export type Protocol_GetRespObj<Protocol extends SucketProtocol, MsgName extends Protocol_GetReqNames<SucketProtocol>> = FieldsToUnion<FieldsNotEndingWith<FieldsStartingWith<ArrToObjHelper<UnionToArray<Protocol['reqRespTypes']>, 'type'>, MsgName & string>, 'Req'>> | MSG_Error
 

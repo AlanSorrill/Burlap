@@ -12,7 +12,7 @@ type SEVT_MovieRecomendation = EventTemplate<'movieRecomend', { genre: string },
 type SEVT_NewFriend = EventTemplate<'newFriend', { userId: string }, { fromUserId: string, toUserId: string, time: number }>
 type SEVT = SEVT_NewFriend | SEVT_MovieRecomendation
 
-type TestProtocol = { reqRespTypes: MSG, eventTypes: SEVT, state: {} }
+type TestProtocol = { reqRespTypes: MSG, eventTypes: {}, state: {} }
 let rootPath = Path.join(__dirname.replace(`build${Path.sep}serverTsBuild`, 'src'), '..')
 console.log(`RootDir ${rootPath}`)
 let backend = Burlap.Create<TestProtocol>({
@@ -37,8 +37,8 @@ let backend = Burlap.Create<TestProtocol>({
 
         // }
         eventPredicates: {
-            movieRecomend: (reg, packet) => (true),
-            newFriend: (reg, packet) => (true)
+            // movieRecomend: (reg, packet) => (true),
+            // newFriend: (reg, packet) => (true)
         },
         defaultState: () => ({})
     },

@@ -1,7 +1,9 @@
-import { deCapitalizeFirstLetter } from '../CommonImports'
+import { deCapitalizeFirstLetter, UnionToArray } from '../CommonImports'
 export * from './CompoundTypes'
 export type RemovePostfix<Str extends string, Postfix extends string> = Str extends `${infer A}${Postfix}` ? A : Str
-export type ArrToObjHelper<Arr extends unknown[], KeyField extends string, Out extends {} = {}> = Arr extends [infer SubType, ...infer Rest] ? (KeyField extends keyof SubType ? (ArrToObjHelper<Rest, KeyField, Out & { [P in SubType[KeyField] & string]: SubType }>) : `BadKey ${KeyField}`) : Out
+export type ArrToObjHelper<Arr extends unknown[], KeyField extends string, Out extends {} = {}> = Arr extends [infer SubType, ...infer Rest] ? (KeyField extends keyof SubType ? (ArrToObjHelper<Rest, KeyField, Out & { [P in SubType[KeyField] & string]: SubType }>) : ArrToObjHelper<Rest, KeyField, Out>) : Out
+
+let testArrToObj: ArrToObjHelper<UnionToArray<{type: 'a', info: string} | {type: 'b', data: number} | {type: 'c', isGood: boolean} | {dumb: 'stuff'} | never>,'type'>
 
 export type KeysEndingWith_ReturnPrefix<Obj extends {}, Ending extends string> = {
     [P in keyof Obj]: P extends `${infer prefix}${Ending}` ? prefix : never
@@ -39,11 +41,11 @@ export type ReadOnlySetters<T extends {}> = Readonly<T> & {
 export function readOnlySettersProxy<T extends {}>(t: T): ReadOnlySetters<T> {
     return new Proxy(t, {
         get(target, key) {
-            if(typeof key == 'string'){
-                if(key.startsWith('set')){
+            if (typeof key == 'string') {
+                if (key.startsWith('set')) {
                     let targetKey = deCapitalizeFirstLetter(key.substring(3))
                     console.log(`ReadOnlySetterProxy setting ${targetKey}`)
-                    return (freshVal)=>{
+                    return (freshVal) => {
                         target[targetKey] = freshVal;
                     }
                 }
