@@ -69,9 +69,10 @@ export class ClientWebSucket<Protocol extends SucketProtocol> extends ClientSuck
     private constructor(options: ClientSucketOptions<Protocol>) {
         super(options);
     }
-    public static async Create<Protocol extends SucketProtocol>(url: string, options: ClientSucketOptions<Protocol>) {
-        let out = new ClientWebSucket(options);
+    public static async Create<Protocol extends SucketProtocol>(url: string) {
+        let out = new ClientWebSucket<Protocol>({} as any);
         await out.connect(url);
+        
         return out;
     }
 

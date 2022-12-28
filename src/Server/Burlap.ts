@@ -5,9 +5,19 @@ import webpack, { Configuration, Stats } from "webpack";
 import Path from 'path'
 import ws from 'ws'
 import http from 'http'
-import { CombineProtocols, DefaultProtocol, Protocol_GetEventNames, Protocol_GetEventPacketObj, Protocol_GetState, ServerSucketOptions, ServerWebSucket,  SucketProtocol } from './ServerImports';
+import { CallbackMap, CombineProtocols, DefaultProtocol, Protocol_GetEventNames, Protocol_GetEventPacketObj, Protocol_GetEventRegObj, Protocol_GetState, ServerSucket, ServerSucketOptions, ServerWebSucket, SucketProtocol, thickLog } from './ServerImports';
 import { addWebpackListener, clientWebpackConfig } from './ClientWebpackConfig';
+type BurlapEvent_ClientEvtRegistrationChange<EventName extends Protocol_GetEventNames<Protocol>, Protocol extends SucketProtocol> = {
+    eventName: EventName,
+    registration: Protocol_GetEventRegObj<Protocol, EventName>,
+    sucket: ServerSucket<Protocol>,
+    op: 'register' | 'cancel' | 'update'
+}
 
+
+export type BurlapEvents<Protocol extends SucketProtocol> = {
+    clientEvtRegistrationChanged: BurlapEvent_ClientEvtRegistrationChange<Protocol_GetEventNames<Protocol>, Protocol>
+}
 export type BurlapOptions<Protocol extends SucketProtocol> = {
     port: number,
     initRouts: (expressApp: core.Express, burlap: Burlap<Protocol>) => Promise<void>
@@ -24,36 +34,40 @@ export class Burlap<Protocol extends SucketProtocol>  {
 
         },
         eventPredicates: {
-            webpackBuildUpdate: (reg, packet,state) => (true)
+            webpackBuildUpdate: (reg, packet, state) => (true)
         },
         defaultState() {
             return {} as Protocol_GetState<DefaultProtocol>
         },
     } as ServerSucketOptions<DefaultProtocol>
-    // sucketOptions: SucketOptions<Protocol>
+
     static async Create<Protocol extends SucketProtocol>(options: BurlapOptions<Protocol>): Promise<Burlap<Protocol>> {
         let out = new Burlap(options);
         await out.init();
         return out;
     }
     private constructor(options: BurlapOptions<Protocol>) {
-        // this.emitEvent = this.emitEvent.bind(this);
+
         let opts = options as BurlapOptions<Protocol | DefaultProtocol>
         opts.sucketOptions = CombineProtocols(opts.sucketOptions, Burlap.defaultSucketOptions)
         this.options = opts;
     }
     private async init() {
+        thickLog(`Initializing Express`,{color: 'Green'})
         let ths: Burlap<Protocol> = this;
         this.app = express()
 
 
+        thickLog(`Initializing Routs`,{color: 'Green'})
         await this.options.initRouts(this.app, ths as any);
-        // this.sucketOptions = addServerOptions(options.sucketOptions, { defaultEventPredicates: { webpackProgress: (reg, packet) => (true) } });
+
+        thickLog(`Initializing WSS`,{color: 'Green'})
         this.socketServer = new ws.Server({ noServer: true });
         this.socketServer.on('connection', (socket: ws.WebSocket) => {
             ths.addSocketHandler(socket)
         });
         let server = http.createServer(this.app).listen(this.options.port)
+        console.log(`Serving on port ${this.options.port}`)
         server.on('upgrade', (request, socket, head) => {
             ths.socketServer.handleUpgrade(request, socket, head, wsSocket => {
                 console.log(`Upgrading websocket`)
@@ -62,14 +76,16 @@ export class Burlap<Protocol extends SucketProtocol>  {
         });
 
 
+        thickLog(`Initializing Webpack`,{color: 'Green'})
         let webpackConfig = clientWebpackConfig(ths.options.webpackEntries)
         this.app.use(await this.initWebpack(webpackConfig))
     }
 
 
 
+
     emitEvent: <EventName extends Protocol_GetEventNames<DefaultProtocol | Protocol>>(eventName: EventName, packet: Protocol_GetEventPacketObj<DefaultProtocol | Protocol, EventName>) => void = function (eventName, packet) {
-        
+
         let ths: Burlap<Protocol> = this
         console.log(`Emitting event ${eventName} to ${ths.suckets.size}`)
         ths.suckets.forEach((sucket) => {
@@ -82,14 +98,26 @@ export class Burlap<Protocol extends SucketProtocol>  {
         let id = `${this.socketCount++}${Date.now()}`
         let sucket = new ServerWebSucket<Protocol | DefaultProtocol>(id, socket, this.options.sucketOptions, this as any)
         let ths = this;
-        sucket.onLifecycle('disconnect',(evt)=>{
+        sucket.onLifecycle('disconnect', (evt) => {
             console.log(`${id} sucket disconnected ${evt.code} ${evt.reason}`)
             ths.suckets.delete(id)
         })
         this.suckets.set(id, sucket);
     }
-     suckets: Map<string, ServerWebSucket<Protocol | DefaultProtocol>> = new Map();
+    suckets: Map<string, ServerWebSucket<Protocol | DefaultProtocol>> = new Map();
 
+    addProtocol<NewProtocol extends SucketProtocol>(options: ServerSucketOptions<NewProtocol>) {
+        this.options.sucketOptions = CombineProtocols(this.options.sucketOptions, options) as any;
+        this.suckets.forEach((s) => { s.addProtocol<NewProtocol>(options) })
+    }
+
+    private burlapEventCallbacks: CallbackMap<any> = new CallbackMap();
+    on<BurlapEventName extends keyof BurlapEvents<Protocol>>(eventName: BurlapEventName, callback: (evt: BurlapEvents<Protocol>[BurlapEventName]) => void): () => void {
+        return this.burlapEventCallbacks.addCallback(eventName, callback);
+    }
+    emitServerEvent<BurlapEventName extends keyof BurlapEvents<Protocol>>(eventName: BurlapEventName, evt: BurlapEvents<Protocol>[BurlapEventName]){
+        this.burlapEventCallbacks.notify(eventName,evt);
+    }
 
     compiler: webpack.Compiler
     private async initWebpack(config: Configuration): Promise<webpackDevMiddleware.API<webpackDevMiddleware.IncomingMessage, webpackDevMiddleware.ServerResponse>> {
@@ -119,12 +147,8 @@ export class Burlap<Protocol extends SucketProtocol>  {
                         lastUpdateP = p;
                         console.log(`Webpack Build ${p} ${m}`, _a)
                     }
-                    // (ths as any as Burlap<DefaultSucketProtocol>).emitEvent('webpackProgress', { progress: p, info: `${m}${_a.join(', ')}}` })
-                    // ths.notifySubscribers('', { progress: p, info: _a, message: m, type: 'WebpackBuildUpdate' } as MSG_WebpackBuildUpdate)
+
                     (ths as any as Burlap<DefaultProtocol>).emitEvent('webpackBuildUpdate', { progress: p, message: m, extra: _a })
-                    // ths.webpackWatchers.forEach((callback) => {
-                    //     callback(p, m);
-                    // })
                 })
                 console.log(`Webpack Initialized`);
 

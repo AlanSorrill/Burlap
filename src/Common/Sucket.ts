@@ -1,15 +1,18 @@
-import { ArrToObjHelper, capitalizeFirstLetter, copyCombine, FieldsNotEndingWith, FieldsStartingWith, FieldsToUnion, KeysEndingWith_ReturnPrefix, MSG_Error, RemoveNevers, UnionToArray, UnionToIntersection } from "./CommonImports"
+import { PathInto, ArrToObj, copyCombine, FieldsNotEndingWith, FieldsStartingWith, FieldsToUnion, KeysEndingWith_ReturnPrefix, MSG_Error, RemoveNevers, UnionToArray, UnionToIntersection, TypeFromPath } from "./CommonImports"
 
-export type Protocol_GetReqNames<Protocol extends SucketProtocol> = KeysEndingWith_ReturnPrefix<ArrToObjHelper<UnionToArray<Protocol['reqRespTypes']>, 'type'>, 'Req'> & string
-export type Protocol_GetReqObj<Protocol extends SucketProtocol, MsgName extends Protocol_GetReqNames<SucketProtocol>> = `${MsgName & string}Req` extends keyof ArrToObjHelper<UnionToArray<Protocol['reqRespTypes']>, 'type'> ? ArrToObjHelper<UnionToArray<Protocol['reqRespTypes']>, 'type'>[`${MsgName & string}Req`] : false
-export type Protocol_GetRespObj<Protocol extends SucketProtocol, MsgName extends Protocol_GetReqNames<SucketProtocol>> = FieldsToUnion<FieldsNotEndingWith<FieldsStartingWith<ArrToObjHelper<UnionToArray<Protocol['reqRespTypes']>, 'type'>, MsgName & string>, 'Req'>> | MSG_Error
+export type Protocol_GetReqNames<Protocol extends SucketProtocol> = KeysEndingWith_ReturnPrefix<ArrToObj<UnionToArray<Protocol['reqRespTypes']>, 'type'>, 'Req'> & string
+export type Protocol_GetReqObj<Protocol extends SucketProtocol, MsgName extends Protocol_GetReqNames<SucketProtocol>> = `${MsgName & string}Req` extends keyof ArrToObj<UnionToArray<Protocol['reqRespTypes']>, 'type'> ? ArrToObj<UnionToArray<Protocol['reqRespTypes']>, 'type'>[`${MsgName & string}Req`] : false
+export type Protocol_GetRespObj<Protocol extends SucketProtocol, MsgName extends Protocol_GetReqNames<SucketProtocol>> = FieldsToUnion<FieldsNotEndingWith<FieldsStartingWith<ArrToObj<UnionToArray<Protocol['reqRespTypes']>, 'type'>, MsgName & string>, 'Req'>> | MSG_Error
 
-export type Protocol_GetEventNames<Protocol extends SucketProtocol> = (keyof ArrToObjHelper<UnionToArray<Protocol['eventTypes']>, 'type'>) & string
-export type Protocol_GetEventTemplate<Protocol extends SucketProtocol, EventName extends Protocol_GetEventNames<Protocol>> = ArrToObjHelper<UnionToArray<Protocol['eventTypes']>, 'type'>[EventName]
+export type Protocol_GetEventNames<Protocol extends SucketProtocol> = (keyof ArrToObj<UnionToArray<Protocol['eventTypes']>, 'type'>) & string
+export type Protocol_GetEventTemplate<Protocol extends SucketProtocol, EventName extends Protocol_GetEventNames<Protocol>> = ArrToObj<UnionToArray<Protocol['eventTypes']>, 'type'>[EventName]
 export type Protocol_GetEventPacketObj<Protocol extends SucketProtocol, EventName extends Protocol_GetEventNames<Protocol>> = Protocol_GetEventTemplate<Protocol, EventName> extends EventTemplate<EventName, infer regObj, infer packetObj> ? packetObj : false
 export type Protocol_GetEventRegObj<Protocol extends SucketProtocol, EventName extends Protocol_GetEventNames<Protocol>> = Protocol_GetEventTemplate<Protocol, EventName> extends EventTemplate<EventName, infer regObj, infer packetObj> ? regObj : false
 export type Protocol_GetEventHandle<Protocol extends SucketProtocol, EventName extends Protocol_GetEventNames<Protocol>> = Protocol_GetEventTemplate<Protocol, EventName> extends EventTemplate<EventName, infer regObj, infer packetObj> ? EventHandle<Protocol_GetEventTemplate<Protocol, EventName>> : false
 export type Protocol_GetState<Protocol extends SucketProtocol> = UnionToIntersection<Protocol['state']>
+
+export type SVET_Packet<Event extends EventTemplate<string, any, any>> = Event extends EventTemplate<string, any, infer Packet> ? Packet : 'Not Event'
+
 export type EventHandle<EVT extends EventTemplate<string, {}, {}>> = EVT extends EventTemplate<infer name, infer reg, infer packet> ? {
     cancel: () => void,
     updateRegistration: (edit: Partial<reg>) => Promise<boolean>
@@ -28,7 +31,9 @@ export type UnionFields<A, B> = {
     [P in keyof A]: P extends keyof B ? A[P] | B[P] : never
 }
 
-export function CombineProtocols<A extends SucketProtocol, B extends SucketProtocol>(a: ServerSucketOptions<A>, b: ServerSucketOptions<B>): ServerSucketOptions<A | B> {
+// export function CombineProtocols<A extends SucketProtocol, B extends SucketProtocol>(a: ServerSucketOptions<A>, b: ServerSucketOptions<B>): ServerSucketOptions<A | B> {
+export function CombineProtocols(a, b): any {
+
     let out: any = {}
     for (let [k, v] of Object.entries(a)) {
         if (typeof a[k] == 'object' && typeof b[k] == 'object') {
@@ -65,14 +70,14 @@ export type EventTemplate<EventName extends string, RegObject extends {}, Packet
 }
 
 
-
+type SucketStateSetter<Protocol extends SucketProtocol> = (fresh: Partial<{ [P in Exclude<PathInto<Protocol_GetState<Protocol>>,''>]: TypeFromPath<Protocol_GetState<Protocol>, P> }>) => void;
 type SucketReqRespListenerHelper<MsgTypeDecompound extends {}, Protocol extends SucketProtocol, Side extends 'server' | 'client'> = {
     // [P in KeysEndingWith<MsgTypeDecompound,'Req'> as `on${Capitalize<P>}Request`]: `${P}Resp` extends keyof MsgTypeDecompound ? ()=>(Promise<MsgTypeDecompound[`${P}Resp`]>) : 'No Response Type'
     [P in keyof MsgTypeDecompound as P extends `${infer prefixName}Req` ? `on${Capitalize<prefixName>}` : never]:
-    P extends `${infer prefix}Req` ? (Side extends 'server' ? (((msg: MsgTypeDecompound[P], state: Protocol_GetState<Protocol>) => (Promise<MSG_Error | FieldsToUnion<FieldsNotEndingWith<FieldsStartingWith<MsgTypeDecompound, prefix>, 'Req'>>>))) : (((msg: MsgTypeDecompound[P]) => (Promise<MSG_Error | FieldsToUnion<FieldsNotEndingWith<FieldsStartingWith<MsgTypeDecompound, prefix>, 'Req'>>>)))) : never
+    P extends `${infer prefix}Req` ? (Side extends 'server' ? (((msg: MsgTypeDecompound[P], state: Readonly<Protocol_GetState<Protocol>>, setState: SucketStateSetter<Protocol>) => (Promise<MSG_Error | FieldsToUnion<FieldsNotEndingWith<FieldsStartingWith<MsgTypeDecompound, prefix>, 'Req'>>>))) : (((msg: MsgTypeDecompound[P]) => (Promise<MSG_Error | FieldsToUnion<FieldsNotEndingWith<FieldsStartingWith<MsgTypeDecompound, prefix>, 'Req'>>>)))) : never
 }
-export type ServerSucketReqRespListener<Protocol extends SucketProtocol> = RemoveNevers<SucketReqRespListenerHelper<ArrToObjHelper<UnionToArray<Protocol['reqRespTypes']>, 'type'>, Protocol, 'server'>>
-export type ClientSucketReqRespListener<Protocol extends SucketProtocol> = RemoveNevers<SucketReqRespListenerHelper<ArrToObjHelper<UnionToArray<Protocol['reqRespTypes']>, 'type'>, Protocol, 'client'>>
+export type ServerSucketReqRespListener<Protocol extends SucketProtocol> = RemoveNevers<SucketReqRespListenerHelper<ArrToObj<UnionToArray<Protocol['reqRespTypes']>, 'type'>, Protocol, 'server'>>
+export type ClientSucketReqRespListener<Protocol extends SucketProtocol> = RemoveNevers<SucketReqRespListenerHelper<ArrToObj<UnionToArray<Protocol['reqRespTypes']>, 'type'>, Protocol, 'client'>>
 
 export type EventRegistration<EventName extends string, RegObject extends {}> = RegObject & { eventName: EventName, _id: string }
 
@@ -81,7 +86,7 @@ type SucketEventPredicateHelper<EventTemplatesDecompound extends {}, Protocol ex
     'bad'
 }
 
-export type SucketEventPredicate<Protocol extends SucketProtocol> = RemoveNevers<SucketEventPredicateHelper<ArrToObjHelper<UnionToArray<Protocol['eventTypes']>, 'type'>, Protocol>>
+export type SucketEventPredicate<Protocol extends SucketProtocol> = RemoveNevers<SucketEventPredicateHelper<ArrToObj<UnionToArray<Protocol['eventTypes']>, 'type'>, Protocol>>
 
 
 export type ClientSucketOptions<Protocol extends SucketProtocol> = {
@@ -161,7 +166,7 @@ export abstract class Sucket<Protocol extends SucketProtocol> {
     // }) as any;
     reqRespWaiters: Map<string, (value: Protocol_GetRespObj<Protocol, Protocol_GetReqNames<Protocol> & string>) => void> = new Map();
 
-    send<MsgType extends Protocol_GetReqNames<Protocol>>(msgType: MsgType, msg: Omit<Protocol_GetReqObj<Protocol, MsgType>, 'type'>): Promise<Protocol_GetRespObj<Protocol, MsgType>> {
+    send<MsgType extends Protocol_GetReqNames<Protocol>, RespType extends Protocol_GetRespObj<Protocol, MsgType> = Protocol_GetRespObj<Protocol, MsgType>>(msgType: MsgType, msg: Omit<Protocol_GetReqObj<Protocol, MsgType>, 'type'>): Promise<RespType> {
         return new Promise((acc) => {
             msg['type'] = `${msgType}Req`;
             let tid = this.sendSuckMsg({ suckType: 'reqResReq', message: msg })
@@ -170,7 +175,7 @@ export abstract class Sucket<Protocol extends SucketProtocol> {
         })
     }
 
-    
+
 
     onLifecycle<EventName extends keyof SucketLifecycleEvent>(eventName: EventName, callback: (evt: SucketLifecycleEvent[EventName]) => void): (() => void) {
         let subMap = this.lifecycleListeners.get(eventName)

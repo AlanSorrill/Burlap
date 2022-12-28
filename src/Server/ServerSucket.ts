@@ -1,4 +1,4 @@
-import { Burlap, capitalizeFirstLetter, copyCombine, DefaultProtocol, Protocol_GetEventNames, Protocol_GetEventPacketObj, Protocol_GetEventRegObj, Protocol_GetState, ServerSucketOptions, Sucket, SucketProtocol, SuckMSG, TransactionId } from './ServerImports'
+import { Burlap, capitalizeFirstLetter, CombineProtocols, copyCombine, DefaultProtocol, Protocol_GetEventNames, Protocol_GetEventPacketObj, Protocol_GetEventRegObj, Protocol_GetState, ServerSucketOptions, Sucket, SucketProtocol, SuckMSG, TransactionId } from './ServerImports'
 import ws from 'ws'
 
 // export type SucketOptions<Protocol extends SucketProtocol> = SucketOptions<Protocol> //& { defaultEventPredicates: SucketEventPredicate<DefaultSucketProtocol['eventTypes']> }
@@ -19,8 +19,10 @@ export abstract class ServerSucket<Protocol extends SucketProtocol> extends Suck
     protected eventRegCounter = 0;
     protected eventRegistrations: Map<Protocol_GetEventNames<Protocol>, Map<string, Protocol_GetEventRegObj<Protocol, Protocol_GetEventNames<Protocol>>>> = new Map();
     options: ServerSucketOptions<Protocol>
-    constructor(options: ServerSucketOptions<Protocol>) {
+    burlap: Burlap<Protocol>
+    constructor(options: ServerSucketOptions<Protocol>, burlap: Burlap<Protocol>) {
         super();
+        this.burlap = burlap;
         this.options = options;
         if (Array.isArray(options.defaultState)) {
             this.state = options.defaultState[0]();
@@ -54,6 +56,29 @@ export abstract class ServerSucket<Protocol extends SucketProtocol> extends Suck
             this.sendSuckMsg({ suckType: 'eventPacket', message: packet as any, rejIds: rejIds })
         }
     }
+    private addDefaultState(def: object) {
+        for (let [k, v] of Object.entries(def as object)) {
+            if (typeof this.state[k] == 'undefined') {
+                this.state[k] = v;
+            }
+        }
+    }
+    addProtocol<NewProtocol extends SucketProtocol>(options: ServerSucketOptions<NewProtocol>) {
+        this.options = CombineProtocols(this.options, options);
+        if (Array.isArray(options.defaultState)) {
+            for (let gen of options.defaultState) {
+                let def = gen();
+                if (typeof def == 'object') {
+                    this.addDefaultState(def as object);
+                }
+            }
+        } else {
+            let def = options.defaultState();
+            if (typeof def == 'object') {
+                this.addDefaultState(def as object);
+            }
+        }
+    }
 
     protected async onSuckMsg(msg: TransactionId<SuckMSG<Protocol>>) {
         switch (msg.suckType) {
@@ -66,7 +91,7 @@ export abstract class ServerSucket<Protocol extends SucketProtocol> extends Suck
                     return;
                 }
                 console.log(`Responding to reqResp ${msg.message['type']} with listener ${listenerKey}`, listener)
-                let result = await listener(msg.message,this.state);
+                let result = await listener(msg.message, this.state);
                 this.sendSuckMsg({ suckType: 'reqResResp', transactionId: msg.transactionId, message: result })
                 return;
             case 'eventRegisterRequestReq':
@@ -78,6 +103,12 @@ export abstract class ServerSucket<Protocol extends SucketProtocol> extends Suck
                 }
                 let evtRegId = `${this.eventRegCounter++}${Date.now()}`
                 mapForEvent.set(evtRegId, msg.regObject);
+                this.burlap.emitServerEvent('clientEvtRegistrationChanged', {
+                    eventName: msg.eventName,
+                    registration: msg.regObject,
+                    sucket: this,
+                    op: 'register'
+                })
                 this.sendSuckMsg({ suckType: 'eventRegisterRequestResp', evtRegId: evtRegId, success: true, transactionId: msg.transactionId })
                 return;
             case 'eventUpdateRegReq':
@@ -95,6 +126,12 @@ export abstract class ServerSucket<Protocol extends SucketProtocol> extends Suck
                     oldState[k] = v;
                 }
                 mappForEvent.set(msg.evtRegId, oldState)
+                this.burlap.emitServerEvent('clientEvtRegistrationChanged', {
+                    eventName: msg.eventName,
+                    registration: oldState,
+                    sucket: this,
+                    op: 'update'
+                })
                 this.sendSuckMsg({ suckType: 'eventUpdateRegResp', success: true, transactionId: msg.transactionId })
                 return;
             case 'eventCancel':
@@ -102,6 +139,12 @@ export abstract class ServerSucket<Protocol extends SucketProtocol> extends Suck
                 if (!this.eventRegistrations.has(msg.eventName)) {
                     return;
                 }
+                this.burlap.emitServerEvent('clientEvtRegistrationChanged', {
+                    eventName: msg.eventName,
+                    registration: this.eventRegistrations.get(msg.eventName) as any,
+                    sucket: this,
+                    op: 'cancel'
+                })
                 this.eventRegistrations.get(msg.eventName)?.delete(msg.evtRegId)
                 return;
             default:
@@ -115,14 +158,14 @@ export class ServerWebSucket<Protocol extends SucketProtocol> extends ServerSuck
 
     socket: ws.WebSocket;
     id: string;
-    burlap: Burlap<Protocol>;
+    
     // options: SucketOptions<Protocol>
 
     constructor(id: string, socket: ws.WebSocket, options: ServerSucketOptions<Protocol>, burlap: Burlap<Protocol>) {
-        super(options);
+        super(options, burlap);
         this.id = id;
         this.socket = socket;
-        this.burlap = burlap;
+        
         let ths = this;
         socket.on('open', (ws) => {
             ths.emitLifecycleEvent('connect', {})
