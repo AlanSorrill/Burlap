@@ -1,5 +1,5 @@
 
-import { EventTemplate, DBS_CollectionPath, DBS_CollectionPath_GetType, DBS_Filter, DBS_Move_Type, DBS_Sort, PathInto, TypeFromPath, MOS_Filter, MOS_Sort, MOS_CollectionId as MOS_CollectionPath, MOS_DocumentPath, } from "../CommonImports"
+import { EventTemplate, DBS_CollectionPath, DBS_CollectionPath_GetType, DBS_Filter, DBS_Move_Type, DBS_Sort, PathInto, TypeFromPath, MOS_Filter, MOS_Sort, MOS_CollectionId as MOS_CollectionPath, MOS_DocumentPath, MOS_CollectionId, } from "../CommonImports"
 
 // export type MSG_Connect = { type: 'connectReq', firebaseAuth?: string } | {type: 'connectResp', succ: boolean, authenticated: boolean }
 // export type MSG_Auth = {type: 'authReq', firebaseAuth: string} | {type: 'authSuccess'}
@@ -32,20 +32,21 @@ import { EventTemplate, DBS_CollectionPath, DBS_CollectionPath_GetType, DBS_Filt
 
 //     update: DBS_CollectionUpdate<DBS_CollectionPath_GetType<DBS_Types, CollectionPath>, FieldPath>
 // }
-// export type MSG_DBS_CollectionUpdateRequest<DBS_Types extends {}, CollectionPath extends DBS_CollectionPath<DBS_Types>> = ({
-//     type: 'dbsChangeReq',
-//     collectionPath: CollectionPath,
-//     docId: string,
-//     // fieldPath: FieldPath
-//     update: DBS_CollectionUpdate<DBS_CollectionPath_GetType<DBS_Types, CollectionPath>, PathInto<DBS_CollectionPath_GetType<DBS_Types, CollectionPath>>>
-// }) | {
-//     type: 'dbsChangeResp',
-//     successful: boolean
-// }
-// // export type DBS_Move_Type = 'SwitchIndicies' | 'moveFromShiftOthers'
-// export type DBS_CollectionUpdate<dbObject, FieldPath extends PathInto<dbObject>> = ((TypeFromPath<dbObject, FieldPath> extends Array<infer subType> ? ({ op: 'set', value: TypeFromPath<dbObject, FieldPath> } | { op: 'move', fromIndex: number, toIndex: number, moveType: DBS_Move_Type } | { op: 'push', value: subType } | { op: 'remove', index: number }) : ({ op: 'set', value: TypeFromPath<dbObject, FieldPath> }))) & {
-//     fieldPath: FieldPath
-// }
+export type MSG_MOS_CollectionUpdateRequest<dbObject extends {}> = ({
+    type: 'mosChangeReq',
+    dbName: string,
+    collectionName: string
+    docId: string,
+    fieldPath: string
+    update: MOS_CollectionUpdate<dbObject, PathInto<dbObject>>
+}) | {
+    type: 'mosChangeResp',
+    successful: boolean
+}
+export type MOS_Move_Type = 'SwitchIndicies' | 'moveFromShiftOthers'
+export type MOS_CollectionUpdate<dbObject, FieldPath extends PathInto<dbObject>> = ((TypeFromPath<dbObject, FieldPath> extends Array<infer subType> ? ({ op: 'set', value: TypeFromPath<dbObject, FieldPath> } | { op: 'move', fromIndex: number, toIndex: number, moveType: MOS_Move_Type } | { op: 'push', value: subType } | { op: 'remove', index: number }) : ({ op: 'set', value: TypeFromPath<dbObject, FieldPath> }))) & {
+    fieldPath: FieldPath
+}
 
 // export type DBS_MSG<DBS_Types extends {}> = MSG_DBS_CollectionUpdateRequest<DBS_Types, DBS_CollectionPath<DBS_Types>> |
 //     MSG_DBS_CollectionListRequest<DBS_Types, DBS_CollectionPath<DBS_Types>> |
@@ -55,7 +56,7 @@ import { EventTemplate, DBS_CollectionPath, DBS_CollectionPath_GetType, DBS_Filt
 
 export type MSG_MOS_InitCollection<CollectionType extends {}> = {
     type: 'mosInitCollectionReq',
-    dbName: string
+    collectionId: MOS_CollectionId
     //     collectionPath: CollectionPath
     filter?: MOS_Filter<CollectionType>
     sort?: MOS_Sort<CollectionType>
@@ -63,7 +64,7 @@ export type MSG_MOS_InitCollection<CollectionType extends {}> = {
     type: 'mosInitCollectionResp',
     documents: CollectionType[]
 }
-export type MSG_MOS<CollectionType extends {}> = MSG_MOS_InitCollection<CollectionType>
+export type MSG_MOS<CollectionType extends {}> = MSG_MOS_InitCollection<CollectionType> | MSG_MOS_CollectionUpdateRequest<CollectionType>
 export type SEVT_MOS_CollectionUpdate<CollectionType extends {}> = EventTemplate<'mosCollectionUpdate', { collectionId: MOS_CollectionPath }, {path: MOS_DocumentPath} & ({
     op: 'insert',
     document: CollectionType
@@ -78,4 +79,4 @@ export type SEVT_MOS_CollectionUpdate<CollectionType extends {}> = EventTemplate
 })>
 
 export type MOS_SEVT<DBS_Types extends {}> = SEVT_MOS_CollectionUpdate<DBS_Types>
-export type MOS_Protocol<DBS_Types extends {}> = { reqRespTypes: MSG_MOS<DBS_Types>, eventTypes: MOS_SEVT<DBS_Types>, state: { userId: string | null } }
+export type MOS_Protocol<DBS_Types extends {}> = { reqRespTypes: MSG_MOS<DBS_Types>, eventTypes: MOS_SEVT<DBS_Types>, state: { userId: string | null, mosCollections: Array<[collectionId: MOS_CollectionId, subId: string]> } }

@@ -68,9 +68,23 @@ export type EventTemplate<EventName extends string, RegObject extends {}, Packet
     registration: RegObject,
     packet: PacketObject
 }
-
-
-type SucketStateSetter<Protocol extends SucketProtocol> = (fresh: Partial<{ [P in Exclude<PathInto<Protocol_GetState<Protocol>>,''>]: TypeFromPath<Protocol_GetState<Protocol>, P> }>) => void;
+export function isSucketStateArraySetter<T>(v: Object): v is SucketStateArraySetterValue<T>{
+    if(typeof v != 'object'){
+        return false;
+    }
+    if(Array.isArray(v)){
+        return false;
+    }
+    if(typeof v['$filter'] == 'function'){
+        return true;
+    }
+    if(typeof v['$push'] != 'undefined'){
+        return true;
+    }
+    return false;
+}
+export type SucketStateArraySetterValue<T> = ({$push: T} | {$filter: (v: T)=>boolean})
+export type SucketStateSetter<Protocol extends SucketProtocol> = (fresh: Partial<{ [P in Exclude<PathInto<Protocol_GetState<Protocol>>,''>]: TypeFromPath<Protocol_GetState<Protocol>, P> extends Array<infer sub> ? sub[] | SucketStateArraySetterValue<sub> : TypeFromPath<Protocol_GetState<Protocol>, P> }>) => void;
 type SucketReqRespListenerHelper<MsgTypeDecompound extends {}, Protocol extends SucketProtocol, Side extends 'server' | 'client'> = {
     // [P in KeysEndingWith<MsgTypeDecompound,'Req'> as `on${Capitalize<P>}Request`]: `${P}Resp` extends keyof MsgTypeDecompound ? ()=>(Promise<MsgTypeDecompound[`${P}Resp`]>) : 'No Response Type'
     [P in keyof MsgTypeDecompound as P extends `${infer prefixName}Req` ? `on${Capitalize<prefixName>}` : never]:

@@ -1,6 +1,6 @@
 
 import { Document } from 'mongodb'
-import { Protocol_GetState, SucketProtocol, MatchWildcardFieldNames, PathFlatten, PathFlattenObj, PathInto,  StringifyWildcards,  TypeFromPath, ValidatableKeys, } from '../CommonImports'
+import { Protocol_GetState, SucketProtocol, MatchWildcardFieldNames, PathFlatten, PathFlattenObj, PathInto,  StringifyWildcards,  TypeFromPath, ValidatableKeys, TestTypeA, TestTypeCompound, } from '../CommonImports'
 
 
 

@@ -10,5 +10,6 @@ export * from './DBS/DBS_Protocol'
 export * from './DBS/DBS_Validation'
 
 export * from './MOS/MOS_Types'
-export * from './MOS/MOS'
+export * from './MOS/MOS_Collection'
+export * from './MOS/MOS_Database'
 export * from './MOS/MOS_Protocol'

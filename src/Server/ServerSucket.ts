@@ -1,4 +1,4 @@
-import { Burlap, capitalizeFirstLetter, CombineProtocols, copyCombine, DefaultProtocol, Protocol_GetEventNames, Protocol_GetEventPacketObj, Protocol_GetEventRegObj, Protocol_GetState, ServerSucketOptions, Sucket, SucketProtocol, SuckMSG, TransactionId } from './ServerImports'
+import { Burlap, capitalizeFirstLetter, CombineProtocols, copyCombine, DefaultProtocol, getFromPath, isSucketStateArraySetter, PathInto, Protocol_GetEventNames, Protocol_GetEventPacketObj, Protocol_GetEventRegObj, Protocol_GetState, ServerSucketOptions, Sucket, SucketProtocol, SucketStateArraySetterValue, SucketStateSetter, SuckMSG, TransactionId, TypeFromPath } from './ServerImports'
 import ws from 'ws'
 
 // export type SucketOptions<Protocol extends SucketProtocol> = SucketOptions<Protocol> //& { defaultEventPredicates: SucketEventPredicate<DefaultSucketProtocol['eventTypes']> }
@@ -79,19 +79,45 @@ export abstract class ServerSucket<Protocol extends SucketProtocol> extends Suck
             }
         }
     }
-
+    private stateSetter(fresh: Partial<{ [P in Exclude<PathInto<Protocol_GetState<Protocol>>, ''>]: TypeFromPath<Protocol_GetState<Protocol>, P> }>): void {
+        let target = this.state as any;
+        let targetField: string;
+        for (let [k, v] of Object.entries(fresh)) {
+            let parentPathParts = k.split('.')
+            if (parentPathParts.length != 1) {
+                targetField = parentPathParts.pop() as string
+                target = getFromPath(target, parentPathParts.join('.'))
+            } else {
+                targetField = k;
+            }
+            if (typeof v == 'object' && v != null) {
+                if (isSucketStateArraySetter(v)) {
+                    if(!Array.isArray(target[targetField])){
+                        throw new Error(`Can't do array update to ${JSON.stringify(target[targetField])}`)
+                    }
+                    if(typeof v['$filter'] == 'function'){
+                        target[targetField] = target[targetField].filter(v['$filter'])
+                    } else if(typeof v['$push'] != 'undefined'){
+                        target[targetField].push(v['$push'])
+                    }
+                }
+            }
+            target[targetField] = v;
+            console.log(`Set ${v} (${targetField}) to `, v)
+        }
+    }
     protected async onSuckMsg(msg: TransactionId<SuckMSG<Protocol>>) {
         switch (msg.suckType) {
             case 'reqResReq':
                 let listenerKey = `on${capitalizeFirstLetter(msg.message['type'].substring(0, msg.message['type'].length - 3))}`
-                let listener: (msg: any, state: any) => (Promise<any>) = this.options.reqRespListeners[listenerKey];
+                let listener: (msg: any, state: any, setState: SucketStateSetter<Protocol>) => (Promise<any>) = this.options.reqRespListeners[listenerKey];
                 if (typeof listener == 'undefined') {
                     console.error(`Failed to find listener for ${listenerKey}`, listener)
-
+                    debugger;
                     return;
                 }
                 console.log(`Responding to reqResp ${msg.message['type']} with listener ${listenerKey}`, listener)
-                let result = await listener(msg.message, this.state);
+                let result = await listener(msg.message, this.state, (newState) => { this.stateSetter(newState as any) });
                 this.sendSuckMsg({ suckType: 'reqResResp', transactionId: msg.transactionId, message: result })
                 return;
             case 'eventRegisterRequestReq':
@@ -158,14 +184,14 @@ export class ServerWebSucket<Protocol extends SucketProtocol> extends ServerSuck
 
     socket: ws.WebSocket;
     id: string;
-    
+
     // options: SucketOptions<Protocol>
 
     constructor(id: string, socket: ws.WebSocket, options: ServerSucketOptions<Protocol>, burlap: Burlap<Protocol>) {
         super(options, burlap);
         this.id = id;
         this.socket = socket;
-        
+
         let ths = this;
         socket.on('open', (ws) => {
             ths.emitLifecycleEvent('connect', {})

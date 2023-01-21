@@ -1,6 +1,6 @@
 
 import { Db, MongoClient } from 'mongodb';
-import { Burlap, MOS_PermissionPredicates, MOS_Protocol, SucketProtocol } from '../ServerImports'
+import { Burlap, MOS_CollectionId, MOS_CollectionPermissionPredicates, MOS_PermissionPredicates, MOS_Protocol, SucketProtocol } from '../ServerImports'
 
 export type MOS_Server_Options<DatabaseTypes extends {}, Protocol extends SucketProtocol> = {
     permissions: MOS_PermissionPredicates<DatabaseTypes, Protocol>
@@ -15,10 +15,14 @@ export class MOS_Server<DatabaseTypes extends {}, Protocol extends SucketProtoco
         this.mongoClient = mongoClient;
         burlap.addProtocol<MOS_Protocol<any>>({
             defaultState() {
-                return { userId: null }
+                return { userId: null, mosCollections: [] }
             },
             reqRespListeners: {
-                async onMosInitCollection(msg) {
+                async onMosInitCollection(msg, state,setState) {
+                    setState({mosCollections: {$push: [msg.collectionId, ]}})
+                    return { type: 'Error', message: `Not yet implemented` }
+                },
+                async onMosChange(msg) {
                     return { type: 'Error', message: `Not yet implemented` }
                 }
             },
@@ -34,13 +38,13 @@ export class MOS_Server<DatabaseTypes extends {}, Protocol extends SucketProtoco
                     if (evt.op != 'register') {
                         throw new Error(`Got op ${evt.op} for serverDb that doesn't exist`)
                     }
-                    mosDb = new MOS_Server_Db(evt.registration.collectionId.dbName, ths);
-                    ths.databases.set(evt.registration.collectionId.dbName, mosDb)
+                    // mosDb = new MOS_Server_Db(evt.registration.collectionId.dbName, ths);
+                    // ths.databases.set(evt.registration.collectionId.dbName, mosDb)
                 }
 
                 switch (evt.op) {
                     case 'register':
-                        mosDb.registerCollection( evt.registration.collectionId.collectionName);
+                        mosDb.registerCollection(evt.registration.collectionId.collectionName);
                         return;
                     case 'cancel':
                     // mosDb.cancel
@@ -48,7 +52,7 @@ export class MOS_Server<DatabaseTypes extends {}, Protocol extends SucketProtoco
             }
         }))
     }
-    databases: Map<string, MOS_Server_Db<any>> = new Map();
+    collections: Map<string, MOS_Server_Db<any>> = new Map();
     watchCancellers: (() => void)[] = []
     onDestroy() {
         this.watchCancellers.forEach((cb) => cb())
@@ -71,5 +75,15 @@ export class MOS_Server_Db<CollectionTypes extends {}> {
 
     onDestroy() {
         this.watchCancellers.forEach((cb) => cb())
+    }
+}
+
+export type MOS_Server_Collection_Options<DocType extends {_id: string}, Protocol extends SucketProtocol> = {
+    collectionId: MOS_CollectionId
+    permissions: MOS_CollectionPermissionPredicates<DocType, Protocol> 
+}
+export class MOS_Server_Collection<DocType extends {_id: string}, Protocol extends SucketProtocol>{
+    constructor(options: MOS_Server_Collection_Options<DocType,Protocol>){
+
     }
 }
